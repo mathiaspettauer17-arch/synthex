@@ -1,6 +1,6 @@
 <p align="center">
     <a href="https://github.com/tanaos/synthex">
-        <img src="assets/banner.png" width="600px" alt="Synthex - Generate high quality, synthetic datasets">
+        <img src="https://raw.githubusercontent.com/tanaos/synthex/master/assets/banner.png" width="600px" alt="Synthex - Generate high quality, synthetic datasets">
     </a>
 </p>
 

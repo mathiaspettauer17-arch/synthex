@@ -27,7 +27,7 @@ jobs:
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Sync dependencies
-        run: uv sync
+        run: uv sync --dev
 
       - name: Create .env file for testing
         run: | 

@@ -46,9 +46,7 @@ def test_create_job_success(synthex: Synthex, generate_data_params: dict[Any, An
         number_of_samples=generate_data_params["number_of_samples"],
     )
     
-    assert job_id == "abc123"
-    assert synthex.jobs._current_job_id == "abc123" # type: ignore
-    
+    assert job_id == "abc123"    
     
 @pytest.mark.unit
 @responses.activate

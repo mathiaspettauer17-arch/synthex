@@ -39,10 +39,7 @@ def test_status_success(
         status_code=200
     )
     
-    # Artificially set the current job ID to "job_id" for testing purposes.
-    short_lived_synthex.jobs._current_job_id = job_id # type: ignore
-    
-    status = short_lived_synthex.jobs.status()
+    status = short_lived_synthex.jobs.status(job_id)
     assert isinstance(status, JobStatusResponseModel), "Status should be of type JobStatusResponseModel"
     assert status.status == test_status, f"Status should be {test_status}"
     assert status.progress == test_progress, f"Progress should be {test_progress}"
@@ -50,16 +47,16 @@ def test_status_success(
     
 @responses.activate
 @pytest.mark.unit
-def test_status_no_running_job_failure(
+def test_status_no_job_id_failure(
     short_lived_synthex: Synthex,
 ):
     """
     This test verifies that a `ValidationError` is raised when attempting to 
-    check the status of jobs through `JobsAPI.status` while no job is currently running. If the exception 
+    check the status of jobs through `JobsAPI.status` without passing a job ID. If the exception 
     is not raised, the test will fail with an appropriate error message.
     Args:
         synthex (Synthex): An instance of the `Synthex` class to be tested.
     """
     
     with pytest.raises(ValidationError):
-        short_lived_synthex.jobs.status()
+        short_lived_synthex.jobs.status() # type: ignore

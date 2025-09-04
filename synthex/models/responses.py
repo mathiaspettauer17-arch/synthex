@@ -13,6 +13,7 @@ class SuccessResponse(BaseModel, Generic[T]):
     data: Optional[T] = None
     
     
-class ActionResult(BaseModel):
+class GenerateDataResponse(BaseModel):
     success: bool
-    message: Optional[str] = None
+    message: str
+    job_id: str

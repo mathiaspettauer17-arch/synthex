@@ -1,11 +1,12 @@
 from .api_client import APIClient
-from typing import Any, List, Optional
+from typing import Any, List
 import csv
 import os
 import time
+import threading
 import logging
 
-from .models import ListJobsResponseModel, JobOutputType, JobOutputSchemaDefinition, ActionResult, \
+from .models import ListJobsResponseModel, JobOutputType, JobOutputSchemaDefinition, GenerateDataResponse, \
     JobStatusResponseModel, SuccessResponse
 from .endpoints import LIST_JOBS_ENDPOINT, CREATE_JOB_WITH_SAMPLES_ENDPOINT
 from .decorators import auto_validate_methods
@@ -16,7 +17,6 @@ from .endpoints import GET_JOB_DATA_ENDPOINT, GET_JOB_STATUS_ENDPOINT
 
 logger = logging.getLogger(__name__)
 
-
 @auto_validate_methods
 class JobsAPI:
     """
@@ -25,8 +25,6 @@ class JobsAPI:
     
     def __init__(self, client: APIClient):
         self._client: APIClient = client
-        # TODO: add support for multiple concurrent jobs; this should require launching each job in a separate thread.
-        self._current_job_id: Optional[str] = None
         
     def list(self, limit: int = 10, offset: int = 0) -> ListJobsResponseModel:
         """
@@ -107,9 +105,6 @@ class JobsAPI:
         
         response = self._client.post(f"{CREATE_JOB_WITH_SAMPLES_ENDPOINT}", data=data)
         
-        # Store id of the current job.
-        self._current_job_id = response.data
-        
         if response.data is None:
             raise ValidationError("Response data is None, expected a valid job ID.")
         return response.data
@@ -144,7 +139,6 @@ class JobsAPI:
         # Keep fetching data as long as the status code is 206, meaning that there is more data;
         # When the status code changes to 200, that means there is no more data to fetch.
         keep_polling = True
-        # TODO: a timeout is needed here: if a job has not received any data within x seconds, error out
         while keep_polling:
             # Poll every JOB_DATA_POLLING_INTERVAL seconds
             time.sleep(config.JOB_DATA_POLLING_INTERVAL)
@@ -167,7 +161,7 @@ class JobsAPI:
                         writer.writeheader()
                     # Append each dict as a row.
                     writer.writerows(data)
-
+                    
                     logger.info(f"{len(data)} datapoints written for job {job_id}")
 
         logger.info(f"All datapoints for job {job_id} have been written")
@@ -182,7 +176,7 @@ class JobsAPI:
         output_path: str,
         number_of_samples: int, 
         output_type: JobOutputType = "csv",
-    ) -> ActionResult:
+    ) -> GenerateDataResponse:
         """
         Generates data based on the provided schema definition, examples, and requirements.
         Args:
@@ -197,7 +191,7 @@ class JobsAPI:
                 - "csv": Saves the data to a CSV file.
             output_path (str): The file path where the generated data should be saved.
         Returns:
-            ActionResult: An object indicating that the job was started successfully.
+            GenerateDataResponse: An object indicating that the job was started successfully.
         """
         
         # Sanitize the output path
@@ -214,25 +208,25 @@ class JobsAPI:
         # Create the output directory if it doesn't exist
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-        # Fetch data and write to file
-        self._get_data_and_write_to_file(job_id, output_path, output_type)
+        # Start fetching data in a separate thread
+        th = threading.Thread(target=self._get_data_and_write_to_file, args=(job_id, output_path, output_type))
+        th.start()
 
-        return ActionResult(
+        return GenerateDataResponse(
             success=True,
-            message=f"Job started successfully. Output will be saved to '{output_path}' upon completion.",
+            message=f"Job was started successfully. Output will be saved to '{output_path}'.",
+            job_id=job_id
         )
 
-    def status(self) -> JobStatusResponseModel:
+    def status(self, job_id: str) -> JobStatusResponseModel:
         """
-        Check the status of the job that is currently running.
+        Check the status of a job.
+        Args:
+            job_id (str): The ID of the job to check the status of.
         Returns:
             JobStatusResponseModel: A model containing the status of the job.
         """
-        
-        # No job has been started yet.
-        if not self._current_job_id:
-            raise ValidationError("No job is currently running.")
-                
-        response = self._client.get(GET_JOB_STATUS_ENDPOINT(self._current_job_id))
-                
+
+        response = self._client.get(GET_JOB_STATUS_ENDPOINT(job_id))
+
         return JobStatusResponseModel.model_validate(response.data)

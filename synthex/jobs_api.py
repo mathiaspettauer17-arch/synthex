@@ -3,8 +3,10 @@ from typing import Any, List
 import csv
 import os
 import time
+import threading
+import logging
 
-from .models import ListJobsResponseModel, JobOutputType, JobOutputSchemaDefinition, ActionResult, \
+from .models import ListJobsResponseModel, JobOutputType, JobOutputSchemaDefinition, GenerateDataResponse, \
     JobStatusResponseModel, SuccessResponse
 from .endpoints import LIST_JOBS_ENDPOINT, CREATE_JOB_WITH_SAMPLES_ENDPOINT
 from .decorators import auto_validate_methods
@@ -12,6 +14,8 @@ from .exceptions import ValidationError
 from .config import config
 from .endpoints import GET_JOB_DATA_ENDPOINT, GET_JOB_STATUS_ENDPOINT
 
+
+logger = logging.getLogger(__name__)
 
 @auto_validate_methods
 class JobsAPI:
@@ -101,8 +105,6 @@ class JobsAPI:
         
         response = self._client.post(f"{CREATE_JOB_WITH_SAMPLES_ENDPOINT}", data=data)
         
-        print(f"Started job with ID {response.data}")
-
         if response.data is None:
             raise ValidationError("Response data is None, expected a valid job ID.")
         return response.data
@@ -159,10 +161,10 @@ class JobsAPI:
                         writer.writeheader()
                     # Append each dict as a row.
                     writer.writerows(data)
+                    
+                    logger.info(f"{len(data)} datapoints written for job {job_id}")
 
-                    print(f"{len(data)} datapoints written for job {job_id}")
-
-        print(f"All datapoints for job {job_id} have been written")
+        logger.info(f"All datapoints for job {job_id} have been written")
 
         return True
 
@@ -174,7 +176,7 @@ class JobsAPI:
         output_path: str,
         number_of_samples: int, 
         output_type: JobOutputType = "csv",
-    ) -> ActionResult:
+    ) -> GenerateDataResponse:
         """
         Generates data based on the provided schema definition, examples, and requirements.
         Args:
@@ -189,7 +191,7 @@ class JobsAPI:
                 - "csv": Saves the data to a CSV file.
             output_path (str): The file path where the generated data should be saved.
         Returns:
-            ActionResult: An object indicating that the job was started successfully.
+            GenerateDataResponse: An object indicating that the job was started successfully.
         """
         
         # Sanitize the output path
@@ -206,12 +208,14 @@ class JobsAPI:
         # Create the output directory if it doesn't exist
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-        # Fetch data and write to file
-        self._get_data_and_write_to_file(job_id, output_path, output_type)
+        # Start fetching data in a separate thread
+        th = threading.Thread(target=self._get_data_and_write_to_file, args=(job_id, output_path, output_type))
+        th.start()
 
-        return ActionResult(
+        return GenerateDataResponse(
             success=True,
-            message=f"Job with ID {job_id} was started successfully. Output will be saved to '{output_path}'.",
+            message=f"Job was started successfully. Output will be saved to '{output_path}'.",
+            job_id=job_id
         )
 
     def status(self, job_id: str) -> JobStatusResponseModel:

@@ -2,7 +2,7 @@ from typing import Callable
 
 
 # General
-API_BASE_URL: str = "https://compute.tanaos.com"
+API_BASE_URL: str = "https://synthex.tanaos.com"
 PING_ENDPOINT = "/"
 HANDSHAKE_ENDPOINT = "handshake"
 

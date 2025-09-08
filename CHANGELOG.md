@@ -1,3 +1,9 @@
+## Release v0.4.2 - September 8, 2025
+
+### Changed
+
+- Updated Synthex base URL.
+
 ## Release v0.4.1 - September 4, 2025
 
 ### Added
